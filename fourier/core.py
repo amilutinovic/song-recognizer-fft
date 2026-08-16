@@ -194,6 +194,38 @@ def fft_batch(frames: np.ndarray) -> np.ndarray:
     return X
 
 
+def ifft_batch(X: np.ndarray) -> np.ndarray:
+    """
+    Inverse DFT/IFFT computed directly from its definition.
+
+    X.shape = (num_frames, N)
+
+    For every frame:
+
+        x[n] = (1/N) * sum_{k=0}^{N-1}X[k] * exp(2*pi*i*k*n/N)
+
+    Returns:
+        Array of shape (num_frames, N).
+    """
+    X = np.asarray(X, dtype=complex)
+
+    if X.ndim == 1:
+        X = X.reshape(1, -1)
+
+    num_frames, N = X.shape
+
+
+    # Frequency indices
+    k = np.arange(N)
+
+    # Time indices
+    n = np.arange(N)
+
+    # IFFT matrix: W[n, k] = exp(2*pi*i*k*n/N)
+    W = np.exp(2j * np.pi * np.outer(n, k) / N)
+
+    return (X @ W.T) / N
+
 
 if __name__ == "__main__":
     print("Checking Fourier implementations against numpy.fft (reference)\n")
