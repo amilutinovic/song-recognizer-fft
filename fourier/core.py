@@ -107,3 +107,121 @@ def fft_recursive(x: np.ndarray) -> np.ndarray:
     t = w * odd
     return np.concatenate([even + t, even - t])
 
+
+#Iterative FFT
+##################################
+
+def _bit_reverse_indices(N: int) -> np.ndarray:
+    """
+    Return the bit-reversal permutation of indices 0 .. N-1.
+
+    The recursive FFT keeps splitting into even/odd
+    indices. If you follow where each sample ends up, the order turns
+    out to be exactly the bit-reversed order. The iterative version has
+    no recursion to do that splitting, so it reorders the samples up
+    front, then builds the result bottom-up.
+    """
+    bits = N.bit_length() - 1        # e.g. N=8 -> 3 bits
+    idx = np.arange(N)
+    rev = np.zeros(N, dtype=int)
+    for i in range(bits):
+        # Take bit i of every index and place it at the mirrored position
+        rev = (rev << 1) | ((idx >> i) & 1)
+    return rev
+
+def fft(x: np.ndarray) -> np.ndarray:
+    """Iterative radix-2 FFT, vectorized over NumPy arrays.
+
+    Instead of recursion, it works bottom-up: first the samples are
+    reordered by the bit-reversal permutation, then in log2(N) passes
+    the blocks of length 2, 4, 8, ... N are merged.
+
+    In a single pass *all* butterflies at that level
+    are computed at once, as an operation over an array of shape
+    (num_blocks, block_size). Hence there is no Python loop over blocks,
+    only log2(N) passes in total.
+
+    This is the default implementation used by the rest of the project.
+    """
+    x = np.asarray(x)
+    if x.ndim != 1:
+        raise ValueError("FFT expects a 1D array; use fft_batch for many signals")
+    return fft_batch(x.reshape(1, -1))[0]
+
+
+def fft_batch(frames: np.ndarray) -> np.ndarray:
+    """FFT over every row of a 2D array (frames.shape = (num_frames, N)).
+
+    This is the shape the STFT layer needs: all windows of the signal
+    are transformed with a single call, without a Python loop over
+    frames. As a result, processing a whole song is an order of
+    magnitude faster than calling fft() in a loop.
+    """
+    frames = np.asarray(frames)
+    if frames.ndim == 1:
+        frames = frames.reshape(1, -1)
+    if frames.ndim != 2:
+        raise ValueError("fft_batch expects a 1D or 2D array")
+
+    n_frames, N = frames.shape
+    if not is_pow2(N):
+        raise ValueError(
+            f"Frame length must be a power of two, got N={N} "
+        )
+
+    # Bit-reversal reordering of all frames at once.
+    X = frames[:, _bit_reverse_indices(N)].astype(np.complex128, copy=True)
+
+    # 2) At each pass the block size doubles.
+    size = 2
+    while size <= N:
+        half = size // 2
+        # Twiddle factors for the current level: w^j, j = 0 .. half-1
+        w = np.exp(-2j * np.pi * np.arange(half) / size)
+
+        # Reshape to (n_frames, num_blocks, size) 
+        blocks = X.reshape(n_frames, -1, size)
+
+        # The butterfly is computed in-place: the upper half of the
+        # block is multiplied by the twiddle factors, then added to and
+        # subtracted from the lower half.
+        t = blocks[:, :, half:] * w
+        blocks[:, :, half:] = blocks[:, :, :half] - t
+        blocks[:, :, :half] += t
+
+        size <<= 1
+
+    return X
+
+
+
+if __name__ == "__main__":
+    print("Checking Fourier implementations against numpy.fft (reference)\n")
+
+    rng = np.random.default_rng(0)
+    sizes = [2, 4, 8, 16, 64, 256, 1024]
+
+    # each row: (label, function, which sizes it supports)
+    implementations = [
+        ("dft (definition loop)", dft, sizes),
+        ("dft_via_matrix       ", dft_via_matrix, sizes),
+        ("fft_recursive        ", fft_recursive, sizes),
+        ("fft                  ", fft, sizes),
+    ]
+
+    all_ok = True
+    for label, func, supported in implementations:
+        results = []
+        for N in supported:
+            x = rng.standard_normal(N) + 1j * rng.standard_normal(N)
+            ok = np.allclose(func(x), np.fft.fft(x), atol=1e-9)
+            results.append(ok)
+            all_ok = all_ok and ok
+        status = "OK " if all(results) else "FAIL"
+        print(f"  [{status}] {label}  matches numpy for N = {supported}")
+
+    print()
+    if all_ok:
+        print("All implementations match numpy. Everything works.")
+    else:
+        print("Something does not match. Check the FAIL rows above.")
