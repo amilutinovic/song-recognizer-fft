@@ -223,3 +223,11 @@ __marimo__/
 venv/
 env/
 .ipynb_checkpoints/
+
+# Audio and Database
+data/songs/*
+data/samples/*
+!data/songs/.gitkeep
+!data/samples/.gitkeep
+*.db
+*.pkl
