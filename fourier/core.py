@@ -225,35 +225,3 @@ def ifft_batch(X: np.ndarray) -> np.ndarray:
     W = np.exp(2j * np.pi * np.outer(n, k) / N)
 
     return (X @ W.T) / N
-
-
-if __name__ == "__main__":
-    print("Checking Fourier implementations against numpy.fft (reference)\n")
-
-    rng = np.random.default_rng(0)
-    sizes = [2, 4, 8, 16, 64, 256, 1024]
-
-    # each row: (label, function, which sizes it supports)
-    implementations = [
-        ("dft (definition loop)", dft, sizes),
-        ("dft_via_matrix       ", dft_via_matrix, sizes),
-        ("fft_recursive        ", fft_recursive, sizes),
-        ("fft                  ", fft, sizes),
-    ]
-
-    all_ok = True
-    for label, func, supported in implementations:
-        results = []
-        for N in supported:
-            x = rng.standard_normal(N) + 1j * rng.standard_normal(N)
-            ok = np.allclose(func(x), np.fft.fft(x), atol=1e-9)
-            results.append(ok)
-            all_ok = all_ok and ok
-        status = "OK " if all(results) else "FAIL"
-        print(f"  [{status}] {label}  matches numpy for N = {supported}")
-
-    print()
-    if all_ok:
-        print("All implementations match numpy. Everything works.")
-    else:
-        print("Something does not match. Check the FAIL rows above.")
