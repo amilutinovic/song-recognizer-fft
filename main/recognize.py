@@ -1,8 +1,6 @@
 """
 Recognize a song from a short audio clip.
 
-Author: Person A
-
 The clip can come from a file (a snippet you cut out, or a whole song) or
 from the microphone (play a song out loud and record a few seconds). Both
 paths run the same pipeline as build_database.py, then match against the DB:
