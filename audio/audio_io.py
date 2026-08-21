@@ -72,3 +72,65 @@ def add_noise(signal, snr_db, seed=None):
     noise_power = signal_power / (10 ** (snr_db / 10.0))
     noise = rng.normal(0.0, np.sqrt(noise_power), size=signal.shape)
     return normalize(signal + noise.astype(np.float32))
+
+
+
+class MicRecorder:
+    """
+    Start/stop microphone recorder for the UI.
+
+    Unlike record_microphone(), which records a fixed number of seconds and
+    blocks, this keeps a stream open and collects audio in the background
+    until you call stop(). That lets the user control the clip length by
+    clicking the button to start and clicking again to stop.
+
+    """
+
+    def __init__(self, sample_rate=SAMPLE_RATE):
+        self.sample_rate = sample_rate
+        self._chunks = []
+        self._stream = None
+
+    def start(self):
+        """Open the microphone stream and begin collecting audio."""
+        try:
+            import sounddevice as sd
+        except ImportError as exc:
+            raise ImportError(
+                "sounddevice is required to record audio. "
+                "Install it with: pip install sounddevice"
+            ) from exc
+
+        self._chunks = []
+
+        # This callback runs on sounddevice's own audio thread every time a
+        # new block of samples arrives. We just copy it into our list.
+        def callback(indata, frames, time_info, status):
+            self._chunks.append(indata.copy())
+
+        self._stream = sd.InputStream(
+            samplerate=self.sample_rate,
+            channels=1,
+            dtype="float32",
+            callback=callback,
+        )
+        self._stream.start()
+
+    def stop(self):
+        """Stop recording and return the collected mono signal (normalized).
+
+        Returns an empty array if nothing was recorded.
+        """
+        if self._stream is not None:
+            self._stream.stop()
+            self._stream.close()
+            self._stream = None
+
+        if not self._chunks:
+            return np.zeros(0, dtype=np.float32)
+
+        signal = np.concatenate(self._chunks, axis=0).flatten()
+        return normalize(signal.astype(np.float32))
+
+    def is_recording(self):
+        return self._stream is not None
