@@ -61,8 +61,8 @@ def process_song(path):
 
 def main():
     parser = argparse.ArgumentParser(description="Build the fingerprint DB")
-    parser.add_argument("--songs", default="data/songs")
-    parser.add_argument("--db", default="data/fingerprints.db")
+    parser.add_argument("--songs", default=os.path.join(ROOT, "data", "songs"))
+    parser.add_argument("--db", default=os.path.join(ROOT, "data", "fingerprints.db"))
     args = parser.parse_args()
 
     if not os.path.isdir(args.songs):
