@@ -24,6 +24,11 @@ from hashing import generate_hashes
 from database import FingerprintDatabase
 from matching import match_query
 
+# Recognition thresholds. A real match has a huge score (hundreds/thousands)
+# and clearly beats the runner-up; random noise scores in the low single
+# digits. These values sit comfortably in the gap between the two.
+MIN_SCORE = 10      # the winner needs at least this many aligned hashes
+MIN_RATIO = 3.0     # and must beat the runner-up by at least this facto
 
 def split_title(stored_title):
     """The DB stores 'Artist - Title'. Split it back for display."""
@@ -35,7 +40,7 @@ def split_title(stored_title):
 
 class RecognizerWorker(QThread):
     status = pyqtSignal(str)
-    finished = pyqtSignal(list)
+    finished = pyqtSignal(bool, list)   # (recognized?, results)
     failed = pyqtSignal(str)
 
     def __init__(self, db_path, signal=None, file_path=None, parent=None):
@@ -64,7 +69,7 @@ class RecognizerWorker(QThread):
                 signal = self.signal
 
             if signal is None or len(signal) == 0:
-                self.finished.emit([])
+                self.finished.emit(False, [])
                 return
 
             # 2) fingerprint it (this is the Fourier pipeline)
@@ -75,13 +80,18 @@ class RecognizerWorker(QThread):
             hashes = generate_hashes(peaks)
 
             if not hashes:
-                self.finished.emit([])
+                self.finished.emit(False, [])
                 return
 
             # 3) match against the database
             self.status.emit("Matching...")
             db = FingerprintDatabase(self.db_path)
             raw = match_query(hashes, db)          # [(song_id, score), ...]
+
+            if not raw:
+                db.close()
+                self.finished.emit(False, [])
+                return
 
             # 4) turn the top few into display-ready dicts. Confidence is
             # the winner's share of the total top-3 score -- a simple 0..1
@@ -100,7 +110,16 @@ class RecognizerWorker(QThread):
                 })
             db.close()
 
-            self.finished.emit(results)
+            # 5) decide whether this is a real match or nothing in the
+            # database fits. A true match has a high score AND clearly beats
+            # the runner-up; otherwise we report "not recognized" instead of
+            # naming a wrong song.
+            top_score = raw[0][1]
+            second_score = raw[1][1] if len(raw) > 1 else 0
+            ratio = top_score / second_score if second_score > 0 else float("inf")
+            recognized = top_score >= MIN_SCORE and ratio >= MIN_RATIO
+
+            self.finished.emit(recognized, results)
 
         except Exception as exc:
             self.failed.emit(str(exc))

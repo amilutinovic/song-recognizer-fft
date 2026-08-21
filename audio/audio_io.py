@@ -92,7 +92,17 @@ class MicRecorder:
         self._stream = None
 
     def start(self):
-        """Open the microphone stream and begin collecting audio."""
+        """Open the microphone stream and begin collecting audio.
+
+        We record at the device's own default sample rate (usually 44100 or
+        48000 Hz) instead of forcing 11025 Hz. Opening an InputStream
+        directly at an unusual rate like 11025 is unreliable -- on some
+        systems (notably macOS) the driver silently runs at its native rate
+        anyway, so the samples come in at the wrong speed and every peak
+        lands in the wrong place. Recording at the native rate and
+        resampling ourselves in stop() gives the same clean signal that
+        sd.rec() produces.
+        """
         try:
             import sounddevice as sd
         except ImportError as exc:
@@ -103,13 +113,20 @@ class MicRecorder:
 
         self._chunks = []
 
+        # Ask the device for its own default input sample rate.
+        try:
+            device_info = sd.query_devices(kind="input")
+            self._device_rate = int(device_info["default_samplerate"])
+        except Exception:
+            self._device_rate = 44100      # safe fallback
+
         # This callback runs on sounddevice's own audio thread every time a
         # new block of samples arrives. We just copy it into our list.
         def callback(indata, frames, time_info, status):
             self._chunks.append(indata.copy())
 
         self._stream = sd.InputStream(
-            samplerate=self.sample_rate,
+            samplerate=self._device_rate,
             channels=1,
             dtype="float32",
             callback=callback,
@@ -117,10 +134,9 @@ class MicRecorder:
         self._stream.start()
 
     def stop(self):
-        """Stop recording and return the collected mono signal (normalized).
-
-        Returns an empty array if nothing was recorded.
-        """
+        """Stop recording and return the collected mono signal at
+        SAMPLE_RATE (normalized). Returns an empty array if nothing was
+        recorded."""
         if self._stream is not None:
             self._stream.stop()
             self._stream.close()
@@ -130,7 +146,14 @@ class MicRecorder:
             return np.zeros(0, dtype=np.float32)
 
         signal = np.concatenate(self._chunks, axis=0).flatten()
-        return normalize(signal.astype(np.float32))
 
-    def is_recording(self):
-        return self._stream is not None
+        # Resample from the device rate down to SAMPLE_RATE, the rate the
+        # database was built at. This mirrors what librosa/sd.rec do
+        # internally, so the query signal matches the stored fingerprints.
+        if self._device_rate != self.sample_rate:
+            n_out = int(len(signal) * self.sample_rate / self._device_rate)
+            old_idx = np.arange(len(signal))
+            new_idx = np.linspace(0, len(signal) - 1, n_out)
+            signal = np.interp(new_idx, old_idx, signal)
+
+        return normalize(signal.astype(np.float32))
