@@ -233,3 +233,5 @@ data/samples/*
 *.pkl
 
 .DS_Store
+
+data/__MACOSX/

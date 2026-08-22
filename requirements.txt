@@ -4,3 +4,4 @@ soundfile>=0.12
 sounddevice>=0.4
 scipy>=1.10
 matplotlib>=3.7
+PyQt6==6.11.0
