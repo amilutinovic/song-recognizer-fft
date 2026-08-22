@@ -39,7 +39,7 @@ Example:
 python3 recognize.py --file "data/songs/LZYBY - Baby Bird.mp3" --start 30 --duration 8
 ```
 
-##### 3.2 Running it with UI:
+##### 3.2 Running it with 💖UI💖:
 ```bash
 python3 ui/main_window.py
 ```
