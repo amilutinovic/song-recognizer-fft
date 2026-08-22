@@ -43,6 +43,11 @@ python3 recognize.py --file "data/songs/LZYBY - Baby Bird.mp3" --start 30 --dura
 ```bash
 python3 ui/main_window.py
 ```
+![Application interface](data/images/ui_listening.png)
+![Application interface](data/images/ui_result.png)
+
+
+
 
 ## Authors:
 Lana Matić 

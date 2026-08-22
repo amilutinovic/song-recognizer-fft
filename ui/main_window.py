@@ -25,6 +25,8 @@ from amoeba_button import AmoebaButton
 from recognizer_worker import RecognizerWorker
 from result_card import ResultCard
 from audio_io import MicRecorder
+from audio_analysis import AudioAnalysisWidget
+
 
 DB_PATH = os.path.join(ROOT, "data", "fingerprints.db")
 
@@ -48,11 +50,9 @@ class MainWindow(QWidget):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
-        # LEFT: reserved for the colleague's live spectrogram. Left empty
-        # so she can decide how to fill it (inline view or a popup).
-        self.spectrogram_panel = QFrame()
-        self.spectrogram_panel.setObjectName("spectrogramPanel")
-        root.addWidget(self.spectrogram_panel, stretch=5)
+       # LEFT: audio analysis of the current recording.
+        self.audio_analysis = AudioAnalysisWidget()
+        root.addWidget(self.audio_analysis, stretch=5)
 
         # MIDDLE: amoeba button + status line.
         center = QVBoxLayout()
@@ -92,7 +92,10 @@ class MainWindow(QWidget):
 
     def _start_listening(self):
         self._clear_results()
+        self.audio_analysis.clear()
+
         self.status_label.setText("Listening... tap again to stop")
+
         try:
             self._recorder.start()
         except Exception as exc:
@@ -111,8 +114,11 @@ class MainWindow(QWidget):
 
     # --- results ---------------------------------------------------------
 
-    def _on_results(self, recognized, results):
+    def _on_results(self, recognized, results, spectrum, peaks):
         self._clear_results()
+
+        self.audio_analysis.set_audio_analysis(spectrum, peaks)
+        
         if recognized and results:
             self.status_label.setText("Tap to listen")
             self.results_title.setText("Top matches")

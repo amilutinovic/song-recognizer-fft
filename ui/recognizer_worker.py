@@ -40,7 +40,7 @@ def split_title(stored_title):
 
 class RecognizerWorker(QThread):
     status = pyqtSignal(str)
-    finished = pyqtSignal(bool, list)   # (recognized?, results)
+    finished = pyqtSignal(bool, list, object, object)   # (recognized?, results, spectrum, peaks)
     failed = pyqtSignal(str)
 
     def __init__(self, db_path, signal=None, file_path=None, parent=None):
@@ -69,7 +69,7 @@ class RecognizerWorker(QThread):
                 signal = self.signal
 
             if signal is None or len(signal) == 0:
-                self.finished.emit(False, [])
+                self.finished.emit(False, [], None, None)
                 return
 
             # 2) fingerprint it (this is the Fourier pipeline)
@@ -80,7 +80,7 @@ class RecognizerWorker(QThread):
             hashes = generate_hashes(peaks)
 
             if not hashes:
-                self.finished.emit(False, [])
+                self.finished.emit(False, [], spectrum, peaks)
                 return
 
             # 3) match against the database
@@ -119,7 +119,12 @@ class RecognizerWorker(QThread):
             ratio = top_score / second_score if second_score > 0 else float("inf")
             recognized = top_score >= MIN_SCORE and ratio >= MIN_RATIO
 
-            self.finished.emit(recognized, results)
+            self.finished.emit(
+                recognized,
+                results,
+                spectrum,
+                peaks,
+            )
 
         except Exception as exc:
             self.failed.emit(str(exc))
