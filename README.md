@@ -2,7 +2,6 @@
 
 An app that uses Fourier transformation to recongnize songs from a short audio recording of a song's clip.
 
-
 ## Build and run locally
 
 
@@ -30,8 +29,6 @@ Example:
 python3 recognize.py --mic 8
 ```
 
-##### 3.1 Running it from the terminal:
-##### 3.1 Running it from the terminal:
 Or you can specify the audio file directly, in which xase you run the command with flag `--file FILE`
 
 
