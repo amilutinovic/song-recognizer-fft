@@ -2,6 +2,8 @@
 
 An app that uses Fourier transformation to recongnize songs from a short audio recording of a song's clip.
 
+[Songs used](data/ATTRIBUTIONS.md)
+
 ## Build and run locally
 
 
