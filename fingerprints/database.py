@@ -35,7 +35,7 @@ class FingerprintDatabase:
             CREATE TABLE IF NOT EXISTS songs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT NOT NULL,
-                path TEXT
+                path TEXT UNIQUE
             )
         """)
 
@@ -118,6 +118,11 @@ class FingerprintDatabase:
         fingerprints,
         path = None,
     ):
+        if path is not None:
+            existing = self.get_song_by_path(path)
+            if existing is not None:
+                return existing[0]
+
         song_id = self.add_song(title, path)
 
         self.add_fingerprints(
@@ -149,6 +154,22 @@ class FingerprintDatabase:
         )
 
         return cursor.fetchall()
+
+    def get_song_by_path(self, path):
+        """Return (id, title, path) for a song already stored under this
+        path, or None if it hasn't been fingerprinted yet."""
+        cursor = self.connection.cursor()
+
+        cursor.execute(
+            """
+            SELECT id, title, path
+            FROM songs
+            WHERE path = ?
+            """,
+            (path,),
+        )
+
+        return cursor.fetchone()
 
     def get_song(self, song_id: int):
         cursor = self.connection.cursor()
