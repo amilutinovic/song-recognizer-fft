@@ -37,6 +37,11 @@ class SpectrogramView(QWidget):
 
         self._spectrum = None
 
+        # Set via set_axis_params(). While they are None the axes fall
+        # back to unitless 0.0 - 1.0 ticks.
+        self._sample_rate = None
+        self._hop_length = None
+
         self.setMinimumSize(
             self.PLOT_WIDTH
             + self.LEFT_MARGIN
@@ -57,12 +62,31 @@ class SpectrogramView(QWidget):
             Qt.WidgetAttribute.WA_TranslucentBackground
         )
 
+    def set_axis_params(self, sample_rate, hop_length):
+        """
+        Give the view the STFT parameters it needs to label the axes in
+        Hz and seconds. Without them the ticks stay unitless.
+        """
+        self._sample_rate = sample_rate
+        self._hop_length = hop_length
+        self.update()
+
     def set_spectrum(self, spectrum):
-        self._spectrum = (
-            None
-            if spectrum is None
-            else np.asarray(spectrum)
-        )
+        if spectrum is None:
+            self._spectrum = None
+        else:
+            spectrum = np.asarray(spectrum)
+
+            if spectrum.ndim == 2:
+                # stft() returns (num_frames, n_fft). Keep the lower half
+                # of the frequency axis (the signal is real, so the upper
+                # half is a mirror copy) and transpose into the
+                # (freq, time) layout the drawing code expects.
+                n_freq = spectrum.shape[1] // 2 + 1
+                spectrum = spectrum[:, :n_freq].T
+
+            self._spectrum = spectrum
+
         self.update()
 
     def clear(self):
@@ -299,6 +323,10 @@ class SpectrogramView(QWidget):
                 1.0,
             )
 
+            # Number of STFT frames before downsampling: the axis labels
+            # describe the recording, not the reduced image.
+            source_frames = spectrum.shape[1]
+
             # Reduce resolution for a cleaner image.
             normalized = self._downsample(
                 normalized,
@@ -423,6 +451,21 @@ class SpectrogramView(QWidget):
                 QColor(125, 110, 130)
             )
 
+            # The top of the frequency axis is the Nyquist frequency,
+            # because set_spectrum() keeps bins 0 .. n_fft//2.
+            nyquist = (
+                self._sample_rate / 2.0
+                if self._sample_rate
+                else None
+            )
+
+            # Recording length covered by the STFT frames.
+            duration = (
+                source_frames * self._hop_length / self._sample_rate
+                if self._sample_rate and self._hop_length
+                else None
+            )
+
             # Frequency.
             for i in range(5):
                 ratio = i / 4.0
@@ -439,13 +482,18 @@ class SpectrogramView(QWidget):
                     y,
                 )
 
+                if nyquist is None:
+                    text = f"{ratio:.1f}"
+                else:
+                    text = f"{ratio * nyquist / 1000.0:.1f}"
+
                 painter.drawText(
                     0,
                     y - 7,
                     left - 7,
                     14,
                     Qt.AlignmentFlag.AlignRight,
-                    f"{ratio:.1f}",
+                    text,
                 )
 
             # Time.
@@ -464,13 +512,18 @@ class SpectrogramView(QWidget):
                     bottom + 3,
                 )
 
+                if duration is None:
+                    text = f"{ratio:.1f}"
+                else:
+                    text = f"{ratio * duration:.1f}"
+
                 painter.drawText(
                     x - 15,
                     bottom + 5,
                     30,
                     14,
                     Qt.AlignmentFlag.AlignCenter,
-                    f"{ratio:.1f}",
+                    text,
                 )
 
             # -------------------------------------------------
@@ -495,7 +548,7 @@ class SpectrogramView(QWidget):
                 left - 8,
                 14,
                 Qt.AlignmentFlag.AlignLeft,
-                "Freq.",
+                "kHz" if nyquist is not None else "Freq.",
             )
 
             painter.drawText(
@@ -504,7 +557,7 @@ class SpectrogramView(QWidget):
                 38,
                 14,
                 Qt.AlignmentFlag.AlignRight,
-                "Time",
+                "s" if duration is not None else "Time",
             )
 
             # -------------------------------------------------
@@ -643,6 +696,13 @@ class AudioAnalysisWidget(QFrame):
                 border: none;
             }
         """)
+
+    def set_axis_params(self, sample_rate, hop_length):
+        """Forward the STFT parameters used for the axis units."""
+        self.spectrogram.set_axis_params(
+            sample_rate,
+            hop_length,
+        )
 
     def set_audio_analysis(
         self,

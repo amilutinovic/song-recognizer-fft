@@ -22,9 +22,9 @@ for sub in ("ui", "audio", "fourier", "fingerprints"):
     sys.path.insert(0, os.path.join(ROOT, sub))
 
 from amoeba_button import AmoebaButton
-from recognizer_worker import RecognizerWorker
+from recognizer_worker import RecognizerWorker, HOP_LENGTH
 from result_card import ResultCard
-from audio_io import MicRecorder
+from audio_io import MicRecorder, SAMPLE_RATE
 from audio_analysis import AudioAnalysisWidget
 
 
@@ -52,6 +52,7 @@ class MainWindow(QWidget):
 
        # LEFT: audio analysis of the current recording.
         self.audio_analysis = AudioAnalysisWidget()
+        self.audio_analysis.set_axis_params(SAMPLE_RATE, HOP_LENGTH)
         root.addWidget(self.audio_analysis, stretch=5)
 
         # MIDDLE: amoeba button + status line.

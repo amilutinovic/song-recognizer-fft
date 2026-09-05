@@ -30,6 +30,11 @@ from matching import match_query
 MIN_SCORE = 10      # the winner needs at least this many aligned hashes
 MIN_RATIO = 3.0     # and must beat the runner-up by at least this facto
 
+# STFT parameters for the query clip. The UI imports these so the
+# spectrogram can label its axes in Hz and seconds.
+FRAME_LENGTH = 1024
+HOP_LENGTH = 512
+
 def split_title(stored_title):
     """The DB stores 'Artist - Title'. Split it back for display."""
     if " - " in stored_title:
@@ -74,8 +79,8 @@ class RecognizerWorker(QThread):
 
             # 2) fingerprint it (this is the Fourier pipeline)
             self.status.emit("Analyzing...")
-            spectrum, _ = stft(signal, frame_length=1024, hop_length=512,
-                               window="hann")
+            spectrum, _ = stft(signal, frame_length=FRAME_LENGTH,
+                               hop_length=HOP_LENGTH, window="hann")
             peaks = find_peaks(spectrum)
             hashes = generate_hashes(peaks)
 
@@ -90,7 +95,7 @@ class RecognizerWorker(QThread):
 
             if not raw:
                 db.close()
-                self.finished.emit(False, [])
+                self.finished.emit(False, [], spectrum, peaks)
                 return
 
             # 4) turn the top few into display-ready dicts. Confidence is
