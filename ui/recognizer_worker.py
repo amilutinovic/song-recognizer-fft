@@ -35,6 +35,9 @@ MIN_RATIO = 3.0     # and must beat the runner-up by at least this facto
 FRAME_LENGTH = 1024
 HOP_LENGTH = 512
 
+WINDOW = "hann"
+DB_NAME = "fingerprints.db"
+
 def split_title(stored_title):
     """The DB stores 'Artist - Title'. Split it back for display."""
     if " - " in stored_title:
@@ -80,7 +83,7 @@ class RecognizerWorker(QThread):
             # 2) fingerprint it (this is the Fourier pipeline)
             self.status.emit("Analyzing...")
             spectrum, _ = stft(signal, frame_length=FRAME_LENGTH,
-                               hop_length=HOP_LENGTH, window="hann")
+                               hop_length=HOP_LENGTH, window=WINDOW)
             peaks = find_peaks(spectrum)
             hashes = generate_hashes(peaks)
 

@@ -31,6 +31,13 @@ def blackman_window(length):
         + 0.08 * np.cos(4.0 * np.pi * n / length)
     )
 
+def rect_window(length):
+    """Rectangular window = no window function (all ones).
+    Multiplying the signal by ones leaves it unchanged, so this is the
+    'without a window function' case. Used to demonstrate spectral leakage."""
+    if length <= 0:
+        raise ValueError("Window length must be positive")
+    return np.ones(length)
 
 def get_window(name, length):
     """Return one of the supported windows by name."""
@@ -42,6 +49,8 @@ def get_window(name, length):
         return hamming_window(length)
     if name == "blackman":
         return blackman_window(length)
+    if name == "rect" or name == "none":
+        return rect_window(length)
 
     raise ValueError(
         f"Unknown window '{name}'. "

@@ -22,13 +22,13 @@ for sub in ("ui", "audio", "fourier", "fingerprints"):
     sys.path.insert(0, os.path.join(ROOT, sub))
 
 from amoeba_button import AmoebaButton
-from recognizer_worker import RecognizerWorker, HOP_LENGTH
+from recognizer_worker import RecognizerWorker, HOP_LENGTH, DB_NAME
 from result_card import ResultCard
 from audio_io import MicRecorder, SAMPLE_RATE
 from audio_analysis import AudioAnalysisWidget
 
 
-DB_PATH = os.path.join(ROOT, "data", "fingerprints.db")
+DB_PATH = os.path.join(ROOT, "data", DB_NAME)
 
 
 class MainWindow(QWidget):
